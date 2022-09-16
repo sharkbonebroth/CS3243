@@ -365,53 +365,55 @@ class Searcher:
         
         return False    
 
-    # this function is mainly for debugging and making life easy
-    def print_path(self, path: Iterable[Move]) -> Iterable[Iterable[str]]:
-        board = [[("X" if self.starting_state.board.occupancy_grid[j][i] else " ") for i in range(self.col_max)] for j in range(self.row_max)]
+    # # this function is mainly for debugging and making life easy
+    # def print_path(self, path: Iterable[Move]) -> Iterable[Iterable[str]]:
+    #     board = [[("X" if self.starting_state.board.occupancy_grid[j][i] else " ") for i in range(self.col_max)] for j in range(self.row_max)]
 
-        for enemy, position in self.enemy_pieces:
-            if enemy == "king":
-                mark = "K"
-            elif enemy == "Knight":
-                mark = "H"
-            else:
-                mark = enemy[0]
-            board[position[0]][position[1]] = mark
+    #     for enemy, position in self.enemy_pieces:
+    #         if enemy == "king":
+    #             mark = "K"
+    #         elif enemy == "Knight":
+    #             mark = "H"
+    #         else:
+    #             mark = enemy[0]
+    #         board[position[0]][position[1]] = mark
 
-        for row in range(self.row_max):
-            for col in range(self.col_max):
-                if self.grid[row][col] == -1:
-                    board[row][col] = "O"
+    #     for row in range(self.row_max):
+    #         for col in range(self.col_max):
+    #             if self.grid[row][col] == -1:
+    #                 board[row][col] = "O"
 
-        board[self.start_position[0]][self.start_position[1]] = "S"
+    #     board[self.start_position[0]][self.start_position[1]] = "S"
         
-        for goal in self.goals:
-            board[goal[0]][goal[1]] = "G"
+    #     for goal in self.goals:
+    #         board[goal[0]][goal[1]] = "G"
 
-        for move in path[1:]:
-            board[move[0][0]][move[0][1]] = "#"
+    #     for move in path[1:]:
+    #         board[move[0][0]][move[0][1]] = "#"
 
-        col_labels = "  "
-        for i in range(0, self.col_max):
-            col_labels += chr(ord('A') + i)
-            col_labels += " "
-        print(col_labels)
-        print(" " + "-" * (self.col_max * 2 + 1))
-        for row in range(self.row_max):
-            string = f"{row}|"
-            for col in range(self.col_max):
-                string += board[row][col]
-                string += " "
-            string = string[:-1]
-            string += "|"
-            print(string)
-        print(" " + "-" * (self.col_max * 2 + 1))
+    #     col_labels = "  "
+    #     for i in range(0, self.col_max):
+    #         col_labels += chr(ord('A') + i)
+    #         col_labels += " "
+    #     print(col_labels)
+    #     print(" " + "-" * (self.col_max * 2 + 1))
+    #     for row in range(self.row_max):
+    #         string = f"{row}|"
+    #         for col in range(self.col_max):
+    #             string += board[row][col]
+    #             string += " "
+    #         string = string[:-1]
+    #         string += "|"
+    #         print(string)
+    #     print(" " + "-" * (self.col_max * 2 + 1))
 
 
-        return board       
+    #     return board       
 
 class Searcher_late_GT(Searcher):
     def get_path(self) -> Iterable[Move]:
+        self.costs = {}
+
         while not (self.frontier.is_empty()):
             state = self.frontier.pop()
             # late goal test
@@ -425,6 +427,29 @@ class Searcher_late_GT(Searcher):
                     continue
                 else:
                     self.frontier.push(child_state)
+        return False
+
+class Searcher_AStar_V2(Searcher):
+    def get_path(self) -> Iterable[Move]:
+        self.costs = {}
+        self.visited_states.add(self.start_position)
+        self.costs[self.start_position] = 0
+        while not (self.frontier.is_empty()):
+            # Only add to visited_states when popped
+            state = self.frontier.pop()
+            # late goal test
+            for goal in self.goals:
+                if goal == state.king_position:
+                    return (self.backtrack(state), state.cost_to_reach)
+            child_states = self.get_child_states(state)
+            for child_state in child_states:
+                # Goal test whenever we get child states
+                if (not child_state.king_position in self.visited_states) or (child_state.cost_to_reach < self.costs[child_state.king_position]):
+                    self.frontier.push(child_state)
+                    self.visited_states.add(child_state.king_position)
+                    self.costs[child_state.king_position] = child_state.cost_to_reach
+
+        return False
 
 #############################################################################
 ######## Heuristics!
@@ -443,10 +468,12 @@ def empty_heuristic(position: Position, goals: Iterable[Position]) -> float:
 ######## Implement Search Algorithm
 #############################################################################
 def search(rows, cols, grid, enemy_pieces, own_pieces, goals):
+    if len(goals) == 0:
+        return [], 0
 
-    searcher = Searcher_late_GT(
+    searcher = Searcher_AStar_V2(
         frontier = Heap_frontier(),
-        heuristic_function = euclidian_heuristic,
+        heuristic_function = manhattan_heuristic,
         start_position = own_pieces[0][1],
         row_max = rows,
         col_max = cols,
@@ -454,19 +481,23 @@ def search(rows, cols, grid, enemy_pieces, own_pieces, goals):
         goals = goals,
         grid = grid
     )
-    path, path_cost = searcher.get_path()
-    searcher.print_path(path)
+    path_with_cost = searcher.get_path()
+    if path_with_cost == False:
+        return [], 0
+    else:
+        path, path_cost = path_with_cost
+        # searcher.print_path(path)
 
-    # convert path into the correct format
-    path_correct_format = []
-    for move in path:
-        move_correct_format = []
-        for position in move:
-            move_correct_format.append((chr(position[1] + 97), position[0]))
-        path_correct_format.append(move_correct_format)
+        # convert path into the correct format
+        path_correct_format = []
+        for move in path:
+            move_correct_format = []
+            for position in move:
+                move_correct_format.append((chr(position[1] + 97), position[0]))
+            path_correct_format.append(move_correct_format)
 
-    return path_correct_format, path_cost
-    
+        return path_correct_format, path_cost
+        
 #############################################################################
 ######## Parser function and helper functions
 #############################################################################
