@@ -473,7 +473,7 @@ def search(rows, cols, grid, enemy_pieces, own_pieces, goals):
 
     searcher = Searcher_AStar_V2(
         frontier = Heap_frontier(),
-        heuristic_function = manhattan_heuristic,
+        heuristic_function = euclidian_heuristic,
         start_position = own_pieces[0][1],
         row_max = rows,
         col_max = cols,
