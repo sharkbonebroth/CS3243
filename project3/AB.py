@@ -281,7 +281,7 @@ class State:
         self.valid_move_index = 0
         self.num_child_states = len(self.all_valid_moves)
 
-    def evaluate_heuristics(self,) -> int:
+    def evaluate_heuristics(self) -> int:
         score = 0
         for row in self.board.piece_grid:
             for piece in row:
@@ -289,6 +289,9 @@ class State:
                     score += piece.piece_value * piece.allignment
         
         return score
+
+    def is_terminal(self) -> int: # -1: is_terminal for min agent. 1: is_terminal for max agent, 0: not is_terminal
+        return (self.evaluate_heuristics() < -35000 or self.evaluate_heuristics() > 35000)
 
     def get_all_child_states(self) -> Iterable[State]:
         all_child_states = [State(self.board.move(move[0], move[1]), move, -self.ab_alignment) for move in self.all_valid_moves]
@@ -320,6 +323,9 @@ def ab(
         best_child_state = None
         child_state = state.get_next_child_state()
         while child_state is not None:
+            if child_state.is_terminal():
+                return (child_state.move_to_achieve, float('inf'))
+
             value = ab(
                 state = child_state,
                 depth = depth + 1,
@@ -349,6 +355,9 @@ def ab(
         best_child_state = None
         child_state = state.get_next_child_state()
         while child_state is not None:
+            if child_state.is_terminal():
+                return (child_state.move_to_achieve, float('-inf'))
+
             value = ab(
                 state = child_state,
                 depth = depth + 1,
@@ -502,4 +511,3 @@ if __name__ == "__main__":
     start_time = time.time()
     move = studentAgent(gameboard)
     end_time = time.time()
-    # print(f"Time_elasped: {end_time - start_time}")
